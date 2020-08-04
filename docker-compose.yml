@@ -1,19 +1,48 @@
-version: '3.1'
+version: '3.8'
 
+# для персистентности даних
+volumes:
+  joomla-data-volume:
+#список наших сервісів (контейнерів)
 services:
-  joomla:
-    image: joomla
-    restart: always
-    links:
-      - joomladb:mysql
+  main:
+    #   маршрутизуємо порти
     ports:
-      - 8086:80
+      # контейнер буде доступний на порту 8077 основної системи
+      - "8077:80"
+    build:
+      #     контекст (каталог, що містить dockerfile)
+      context: .
+      dockerfile: environment/dockerfile
+    depends_on:
+      - mysql
+    volumes: # шлях указується від директорії, в якій розміщено docker-compose.yml
+      #   !!!!!!!!!!  ПАПКА З ПРОЕКТОМ !!!!!!!!
+      # монтуємо нашу кореневу директорію (з index.php-скриптом) в кореневу папку http-сервера контейнера
+      - .:/var/www/html/
+      # монтуєм файл логів доступу Apache2 в контейнер
+      - ./environment/httpd-logs/access.log:/var/log/apache2/access.log
+      # монтуєм файл логів помилок Apache2 в контейнер
+      - ./environment/httpd-logs/error.log:/var/log/apache2/error.log
     environment:
-      JOOMLA_DB_HOST: joomladb
-      JOOMLA_DB_PASSWORD: test
+      PHP_EXTENSION_XDEBUG: 1
 
-  joomladb:
-    image: mysql:5.6
+  mysql:
+    ports:
+      - "3377:3306"
+
+    image: mysql:latest
+    command: ['mysqld', '--character-set-server=utf8mb4', '--collation-server=utf8mb4_unicode_ci']
+    #, '--skip-grant-tables', '--skip-networking']
+    #    restart: always
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: test
+      MYSQL_USER: joomla
+      MYSQL_PASSWORD: 753753
+      MYSQL_DATABASE: joomladb
+      MYSQL_ROOT_PASSWORD: 'test'
+    #  Встановіть так, щоб генерувати випадковий початковий пароль для кореневого користувача (використовуючи pwgen).
+    #  Згенерований кореневий пароль буде надруковано в stdout (GENERATED ROOT PASSWORD: .....):
+    #      MYSQL_RANDOM_ROOT_PASSWORD: 1
+    volumes: # шлях указується від директорії, в якій розміщено docker-compose.yml
+      - joomla-data-volume:/var/lib/mysql
